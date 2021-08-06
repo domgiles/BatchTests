@@ -8,7 +8,7 @@ You'll need Python 3.6 or higher installed on the plaform I recommend using a vi
 
 Install the following python libs using the following command
 
-pip install faker colarama halo psycop2g
+pip install faker colorama halo psycopg2-binary
 
 NOTE : You'll also need a user in the target database to run the test against. 
 
