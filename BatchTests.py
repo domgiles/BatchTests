@@ -5,6 +5,7 @@ import os
 import shutil
 import time
 from concurrent.futures.process import ProcessPoolExecutor
+from random import random
 
 import psycopg2
 from colorama import Fore, Style
@@ -49,8 +50,6 @@ class TransactionBench:
     select_statement = """select count(1) from customers_test where state in ('Alaska', 'Hawaii')"""
 
     set_date_format = '''SET datestyle = "ISO, DMY"'''
-    
-    
 
     # Probably don't need to make this a class. Everything is done in the init method.... but just in case.
     def __init__(self, args):
@@ -60,13 +59,18 @@ class TransactionBench:
         self.database = args.database
         self.size = args.size
         self.threads = args.threads
+        self.seed_data = []
+        self.seed_data_size = 10000
 
         records = int(3342227 * self.size)
         file_name = f'People_data_1_{records}.csv'
 
         start = time.time()
+        self.generate_seed_data()
+        print(f'Generated seed data in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}')
+        start = time.time()
         all_files = self.generate_parallel(0)
-        print(f'Generated serial data in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}')
+        print(f'Written serial data in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}')
         start = time.time()
         if len(all_files) > 1:
             all_files = self.concat_files(file_name, records, all_files)
@@ -80,7 +84,7 @@ class TransactionBench:
         self.delete_files(all_files)
         start = time.time()
         all_files = self.generate_parallel(records + 1)
-        print(f'generated data parallel in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}')
+        print(f'Written data parallel in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}')
         start = time.time()
         self.load_data(all_files)
         print(f'Loaded data parallel in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}')
@@ -90,7 +94,7 @@ class TransactionBench:
         print(f'Created indexes in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}')
         start = time.time()
         all_files = self.generate_parallel(records * 2 + 1)
-        print(f'generated data parallel in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}')
+        print(f'Written data parallel in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}')
         start = time.time()
         self.load_data(all_files)
         print(f'Loaded data parallel in with indexes {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}')
@@ -123,9 +127,8 @@ class TransactionBench:
             file_name = f'People_data_{thread_id}_{records}.csv'
             file_details = ['customers_test', file_name, records, int((thread_id - 1) * records) + starting_id]
             all_files.append(file_details)
-        # with ThreadPoolExecutor(max_workers=self.threads) as executor:
         with ProcessPoolExecutor(max_workers=self.threads) as executor:
-            executor.map(self.generate_dummy_data, all_files)
+            executor.map(self.output_generated_data, all_files)
         return all_files
 
     def create_table(self):
@@ -136,47 +139,49 @@ class TransactionBench:
                 cur.execute(self.table_defintion)
                 connection.commit()
 
-    def generate_dummy_data(self, file_details):
-        start = time.time()
+    def generate_seed_data(self) -> []:
+        fake = Faker('en_US', use_weighting=False)
+        for i in range(self.seed_data_size):
+            full_name = fake.name()
+            FLname = full_name.split(" ")
+            Fname = FLname[0]
+            Lname = FLname[1]
+            domain_name = "@gmail.com"
+            userId = Fname + "." + Lname + domain_name
+
+            self.seed_data.append({
+                "Id": i,
+                "EmailId": userId,
+                "Prefix": fake.prefix(),
+                "CustomerName": full_name,
+                "BirthDate": fake.date(pattern="%d-%m-%Y", end_datetime=datetime.date(2000, 1, 1)),
+                "PhoneNumber": fake.phone_number(),
+                "AdditionalEmailId": userId,
+                "Address": fake.address().replace('\n', " "),
+                "ZipCode": fake.zipcode(),
+                "City": fake.city(),
+                "State": fake.state(),
+                "Country": "United States",
+                "YearJoined": int(fake.year()),
+                "TimeJoined": fake.time(),
+                "Link": fake.url(),
+                "CustomerComments": fake.word(),
+                "Occupation": fake.job(),
+                "Bank": fake.aba(),
+                "Password": fake.password()
+            })
+
+    def output_generated_data(self, file_details: []):
         records = file_details[2]
         headers = ["Id", "EmailId", "Prefix", "CustomerName", "BirthDate", "PhoneNumber", "AdditionalEmailId", "Address", "ZipCode", "City", "State", "Country", "YearJoined", "TimeJoined", "Link", "CustomerComments", "Occupation", "Bank", "Password"]
-        fake = Faker('en_US', use_weighting=False)
         with open(file_details[1], 'wt', encoding='utf-8') as csvFile:
             writer = csv.DictWriter(csvFile, fieldnames=headers, delimiter="|", quoting=csv.QUOTE_NONE, )
-            # writer = csv.DictWriter(csvFile)
-            # writer.writeheader()
             for i in range(file_details[3], file_details[3] + records):
-                full_name = fake.name()
-                FLname = full_name.split(" ")
-                Fname = FLname[0]
-                Lname = FLname[1]
-                domain_name = "@gmail.com"
-                userId = Fname + "." + Lname + domain_name
+                rand_pointer = int(random() * self.seed_data_size)
+                data = self.seed_data[rand_pointer]
+                data["Id"] = i
+                writer.writerow(data)
 
-                writer.writerow({
-                    "Id": i,
-                    "EmailId": userId,
-                    "Prefix": fake.prefix(),
-                    "CustomerName": full_name,
-                    "BirthDate": fake.date(pattern="%d-%m-%Y", end_datetime=datetime.date(2000, 1, 1)),
-                    "PhoneNumber": fake.phone_number(),
-                    "AdditionalEmailId": userId,
-                    "Address": fake.address().replace('\n', " "),
-                    "ZipCode": fake.zipcode(),
-                    "City": fake.city(),
-                    "State": fake.state(),
-                    "Country": "United States",
-                    "YearJoined": int(fake.year()),
-                    "TimeJoined": fake.time(),
-                    "Link": fake.url(),
-                    "CustomerComments": fake.word(),
-                    "Occupation": fake.job(),
-                    "Bank": fake.aba(),
-                    "Password": fake.password()
-                })
-
-        end = time.time()
-        # return int((end - start) * 1000)
 
     def get_connection(self):
         return psycopg2.connect(f"host={self.hostname} dbname={self.database} user={self.username} password={self.password}")
