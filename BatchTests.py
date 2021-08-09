@@ -94,7 +94,7 @@ class TransactionBench:
         print(f'Created indexes in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}')
         start = time.time()
         all_files = self.generate_parallel(records * 2 + 1)
-        print(f'Written data parallel in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}')
+        print(f'Written parallel datafiles to filesystem in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}')
         start = time.time()
         self.load_data(all_files)
         print(f'Loaded data to database in parallel in with indexes {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}')
