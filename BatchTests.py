@@ -48,6 +48,10 @@ class TransactionBench:
 
     select_statement = """select count(1) from customers_test where state in ('Alaska', 'Hawaii')"""
 
+    set_date_format = '''SET datestyle = "ISO, DMY"'''
+    
+    
+
     # Probably don't need to make this a class. Everything is done in the init method.... but just in case.
     def __init__(self, args):
         self.username = args.user
@@ -188,6 +192,7 @@ class TransactionBench:
                 with psycopg2.connect(
                         f"host={self.hostname} dbname={self.database} user={self.username} password={self.password}") as connection:
                     with connection.cursor() as cur:
+                        cur.execute(self.set_date_format)
                         cur.copy_from(data_file, file_details[0], sep='|')
                         connection.commit()
                         # print(f"Loaded file {file_details[1]} with {file_details[2]} rows")
