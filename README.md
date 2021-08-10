@@ -6,7 +6,7 @@ Simple test to measure basic capabilities of a database. For the first time I'm 
 ### Installation
 You'll need Python 3.6 or higher installed on the plaform I recommend using a virtual env to create the needed environment.
 
-Install the following python libs using the following command. Note you may need to update pip to install ```psycopg2-binary``` successfully 
+Install the following python libs using the following command. You may need to update pip to install ```psycopg2-binary``` successfully 
 
 ```
 pip install faker colorama halo psycopg2-binary
