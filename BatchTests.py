@@ -1,9 +1,10 @@
 import argparse
 import csv
-import datetime
 import os
 import shutil
 import time
+import datetime
+from datetime import timedelta
 from concurrent.futures.process import ProcessPoolExecutor
 from random import random
 
@@ -64,8 +65,10 @@ class TransactionBench:
 
         records = int(3342227 * self.size)
         file_name = f'People_data_1_{records}.csv'
+        total_time = 0
 
         start = time.time()
+        # I'm rounding everything up to seconds. This is supposed to be a long running test and microseconds is likely a rounding error
         self.generate_seed_data()
         print(f'{Fore.LIGHTBLACK_EX}Generated seed data in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
         start = time.time()
@@ -80,6 +83,7 @@ class TransactionBench:
         print(f'{Fore.LIGHTBLACK_EX}Created table in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
         start = time.time()
         self.load_data(all_files)
+        total_time += (time.time() - start)
         print(f'Loaded data to database serially in {Style.BRIGHT}{Fore.RED}{time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
         self.delete_files(all_files)
         start = time.time()
@@ -87,24 +91,31 @@ class TransactionBench:
         print(f'{Fore.LIGHTBLACK_EX}Written parallel datafiles to filesystem in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
         start = time.time()
         self.load_data(all_files)
+        total_time += (time.time() - start)
         print(f'Loaded data to database in parallel in {Style.BRIGHT}{Fore.RED}{time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
         self.delete_files(all_files)
         start = time.time()
         self.create_indexes()
+        total_time += (time.time() - start)
         print(f'Created indexes in {Style.BRIGHT}{Fore.RED}{time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
         start = time.time()
         all_files = self.generate_parallel(records * 2 + 1)
         print(f'{Fore.LIGHTBLACK_EX}Written parallel datafiles to filesystem in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
         start = time.time()
         self.load_data(all_files)
+        total_time += (time.time() - start)
         print(f'Loaded data to database in parallel in with indexes {Style.BRIGHT}{Fore.RED}{time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
         self.delete_files(all_files)
         start = time.time()
         self.update_data()
+        total_time += (time.time() - start)
         print(f'Updated rows in {Style.BRIGHT}{Fore.RED}{time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
         start = time.time()
         self.scan_data()
+        total_time += (time.time() - start)
+        time_delta = timedelta(seconds=total_time)
         print(f'Scanned Data in {Style.BRIGHT}{Fore.RED}{time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
+        print(f"Total time taken for key tests {Style.BRIGHT}{Fore.RED}{str(time_delta).split('.')[0]}{Style.RESET_ALL}")
 
     def concat_files(self, target_file, row_count, all_files, delete_orginals=True):
         with open(target_file, 'wb') as wfd:
@@ -181,7 +192,6 @@ class TransactionBench:
                 data = self.seed_data[rand_pointer]
                 data["Id"] = i
                 writer.writerow(data)
-
 
     def get_connection(self):
         return psycopg2.connect(f"host={self.hostname} dbname={self.database} user={self.username} password={self.password}")
