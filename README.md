@@ -9,7 +9,7 @@ You'll need Python 3.6 or higher installed on the plaform I recommend using a vi
 Install the following python libs using the following command. You may need to update pip to install ```psycopg2-binary``` successfully 
 
 ```
-pip install faker colorama halo psycopg2-binary
+pip install faker colorama halo psycopg2-binary cx-Oracle
 ```
 
 NOTE : You'll also need a user in the target database to run the test against. The database and user can be named anything you want.
@@ -35,6 +35,8 @@ optional arguments:
                         name of the database/service to run transactions against
   -tc THREADS, --threads THREADS
                         the number of threads used to simulate users running trasactions
+  -t {MySQL,PostgreSQL,Oracle}, --target {MySQL,PostgreSQL,Oracle}
+                        PostgreSQL,MySQL,Oracle
   -s SIZE, --size SIZE  size of dataset i.e. 1 equivalent to 1GB
   --debug               enable debug
   ```
