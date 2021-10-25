@@ -313,7 +313,7 @@ class TransactionBench:
 
 
 if __name__ == '__main__':
-    print(f"{Style.BRIGHT}{Fore.LIGHTRED_EX}BatchTests 0.1{Style.RESET_ALL}")
+
 
     parser = argparse.ArgumentParser(description='Run simple batch like tests')
     # group = parser.add_mutually_exclusive_group(required=False)
@@ -327,5 +327,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', help='enable debug', required=False, action='store_true')
 
     args = parser.parse_args()
+
+    print(f"{Style.BRIGHT}{Fore.LIGHTRED_EX}BatchTests 0.2 for {args.target}{Style.RESET_ALL}")
 
     tb = TransactionBench(args)
