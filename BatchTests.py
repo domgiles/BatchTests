@@ -1,22 +1,26 @@
 import argparse
 import csv
+import datetime
 import os
 import shutil
+import subprocess
 import time
-import datetime
-from datetime import timedelta
 from concurrent.futures.process import ProcessPoolExecutor
+from datetime import timedelta
 from random import random
 
+import cx_Oracle
+import mysql.connector
 import psycopg2
 from colorama import Fore, Style
 from faker import Faker
 
 
 class TransactionBench:
-    drop_table = """drop table if exists customers_test"""
+    drop_table_p = """drop table if exists customers_test"""
+    drop_table_o = """drop table customers_test purge"""
 
-    table_defintion = """create table customers_test(
+    table_defintion_p = """create table customers_test(
                             Id numeric,
                             Email varchar(50),
                             Prefix varchar(50),
@@ -25,9 +29,9 @@ class TransactionBench:
                             Phone_Number varchar(50),
                             Additional_Email varchar(50),
                             Address varchar(200),
-                            Zip_Code varchar(50),
+                            Postcode varchar(50),
                             City varchar(50),
-                            State varchar(50),
+                            County varchar(50),
                             Country varchar(50),
                             Yearjoined numeric,
                             Timejoined time,
@@ -37,6 +41,49 @@ class TransactionBench:
                             Bank varchar(20),
                             Password varchar(50)
                             )"""
+
+    table_defintion_o = """create table customers_test(
+                            Id number,
+                            Email varchar(50),
+                            Prefix varchar(50),
+                            Name varchar(50),
+                            Birth_Date date,
+                            Phone_Number varchar(50),
+                            Additional_Email varchar(50),
+                            Address varchar(200),
+                            Postcode varchar(50),
+                            City varchar(50),
+                            County varchar(50),
+                            Country varchar(50),
+                            Yearjoined number,
+                            Timejoined timestamp,
+                            Link varchar(200),
+                            Comments varchar(50),
+                            Occupation varchar(100),
+                            Bank varchar(20),
+                            Password varchar(50)
+                            )"""
+
+    control_file = """LOAD DATA APPEND INTO TABLE CUSTOMERS_TEST FIELDS TERMINATED BY "|"
+                    (id,
+                    email,
+                    prefix,
+                    name,
+                    birth_date DATE "DD-MM-YYYY",
+                    phone_number,
+                    additional_email,
+                    address,
+                    postcode,
+                    city,
+                    county,
+                    country,
+                    yearjoined,
+                    timejoined TIMESTAMP "HH24:mi:ss",
+                    link,
+                    comments,
+                    occupation,
+                    bank,
+                    password)"""
 
     create_pk = """ALTER TABLE customers_test ADD PRIMARY KEY (Id)"""
 
@@ -48,7 +95,7 @@ class TransactionBench:
 
     update_statement = """UPDATE customers_test set Comments = 'Ive been updated' WHERE Occupation = 'Firefighter'"""
 
-    select_statement = """select count(1) from customers_test where state in ('Alaska', 'Hawaii')"""
+    select_statement = """select count(1) from customers_test where county in ('Surrey', 'Shropshire')"""
 
     set_date_format = '''SET datestyle = "ISO, DMY"'''
 
@@ -58,6 +105,7 @@ class TransactionBench:
         self.password = args.password
         self.hostname = args.hostname
         self.database = args.database
+        self.target = args.target
         self.size = args.size
         self.threads = args.threads
         self.seed_data = []
@@ -117,7 +165,8 @@ class TransactionBench:
         print(f'Scanned Data in {Style.BRIGHT}{Fore.RED}{time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
         print(f"Total time taken for key tests {Style.BRIGHT}{Fore.RED}{str(time_delta).split('.')[0]}{Style.RESET_ALL}")
 
-    def concat_files(self, target_file, row_count, all_files, delete_orginals=True):
+    @staticmethod
+    def concat_files(target_file, row_count, all_files, delete_orginals=True):
         with open(target_file, 'wb') as wfd:
             for f in [file[1] for file in all_files]:
                 with open(f, 'rb') as fd:
@@ -130,6 +179,9 @@ class TransactionBench:
     def delete_files(self, all_files):
         for f in [file[1] for file in all_files]:
             os.remove(f)
+        if self.target == 'Oracle':
+            os.remove('t1.ctl')
+            os.remove('t1.log')
 
     def generate_parallel(self, starting_id):
         all_files = []
@@ -145,13 +197,21 @@ class TransactionBench:
     def create_table(self):
         with self.get_connection() as connection:
             with connection.cursor() as cur:
-                cur.execute(self.drop_table)
+                if self.target == "PostgreSQL":
+                    cur.execute(self.drop_table_p)
+                    cur.execute(self.table_defintion_p)
+                elif self.target == "Oracle":
+                    try:
+                        cur.execute(self.drop_table_o)
+                    except Exception as e:
+                        print(f"{Fore.LIGHTBLACK_EX}Table probably already existed : {e}{Fore.RESET}")
+                    cur.execute(self.table_defintion_o)
                 # connection.commit()
-                cur.execute(self.table_defintion)
+
                 connection.commit()
 
     def generate_seed_data(self) -> []:
-        fake = Faker('en_US', use_weighting=False)
+        fake = Faker('en_GB', use_weighting=False)
         for i in range(self.seed_data_size):
             full_name = fake.name()
             FLname = full_name.split(" ")
@@ -169,10 +229,10 @@ class TransactionBench:
                 "PhoneNumber": fake.phone_number(),
                 "AdditionalEmailId": userId,
                 "Address": fake.address().replace('\n', " "),
-                "ZipCode": fake.zipcode(),
+                "ZipCode": fake.postcode(),
                 "City": fake.city(),
-                "State": fake.state(),
-                "Country": "United States",
+                "State": fake.county(),
+                "Country": "United Kingdom",
                 "YearJoined": int(fake.year()),
                 "TimeJoined": fake.time(),
                 "Link": fake.url(),
@@ -193,8 +253,8 @@ class TransactionBench:
                 data["Id"] = i
                 writer.writerow(data)
 
-    def get_connection(self):
-        return psycopg2.connect(f"host={self.hostname} dbname={self.database} user={self.username} password={self.password}")
+    # def get_connection(self):
+    #     return psycopg2.connect(f"host={self.hostname} dbname={self.database} user={self.username} password={self.password}")
 
     def load_data(self, file_details):
         with ProcessPoolExecutor(max_workers=self.threads) as executor:
@@ -204,15 +264,31 @@ class TransactionBench:
         try:
             with open(os.path.join(os.getcwd(), file_details[1]), 'r') as data_file:
                 next(data_file)
-                with psycopg2.connect(
-                        f"host={self.hostname} dbname={self.database} user={self.username} password={self.password}") as connection:
-                    with connection.cursor() as cur:
-                        cur.execute(self.set_date_format)
-                        cur.copy_from(data_file, file_details[0], sep='|')
-                        connection.commit()
-                        # print(f"Loaded file {file_details[1]} with {file_details[2]} rows")
+                if self.target == 'PostgreSQL':
+                    with self.get_connection() as connection:
+                        with connection.cursor() as cur:
+                            cur.execute(self.set_date_format)
+                            cur.copy_from(data_file, file_details[0], sep='|')
+                            connection.commit()
+                            # print(f"Loaded file {file_details[1]} with {file_details[2]} rows")
+                elif self.target == 'Oracle':
+                    oh = os.getenv('ORACLE_HOME')
+                    fd = file_details[1]
+                    with open('t1.ctl', 'w') as cfd:
+                        cfd.write(self.control_file)
+                    cf = 't1.ctl'
+                    result = subprocess.run([f"{oh}/sqlldr userid={self.username}/{self.password}@//{self.hostname}/{self.database} data={fd} control={os.path.join(os.getcwd())}/{cf} silent=all direct_path_lock_wait=true parallel=true"], stdout=subprocess.PIPE, cwd=os.getcwd(),
+                                            shell=True)
         except Exception as e:
             print(f"Got unexpected exception : {e}")
+
+    def get_connection(self):
+        if self.target == 'PostgreSQL':
+            return psycopg2.connect(f"host={self.hostname} dbname={self.database} user={self.username} password={self.password}")
+        elif self.target == 'MySQL':
+            return mysql.connector.connect(user=self.username, password=self.password, host=self.hostname, database=self.database)
+        elif self.target == 'Oracle':
+            return cx_Oracle.connect(self.username, self.password, f'//{self.hostname}/{self.database}')
 
     def create_indexes(self):
         with self.get_connection() as connection:
@@ -246,6 +322,7 @@ if __name__ == '__main__':
     parser.add_argument('-ho', '--hostname', help='hostmname of target database', required=True)
     parser.add_argument('-d', '--database', help='name of the database/service to run transactions against', required=True)
     parser.add_argument('-tc', '--threads', help='the number of threads used to simulate users running trasactions', default=1, type=int)
+    parser.add_argument('-t', '--target', help='PostgreSQL,MySQL,Oracle', required=True, choices=['MySQL', 'PostgreSQL', 'Oracle'])
     parser.add_argument('-s', '--size', help='size of dataset i.e. 1 equivalent to 1GB', default=1.0, required=True, type=float)
     parser.add_argument('--debug', help='enable debug', required=False, action='store_true')
 
