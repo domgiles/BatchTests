@@ -9,6 +9,6 @@ python-dateutil
 mysql-connector-python
 protobuf
 wcwidth
-psycopg2
+psycopg2-binary
 setuptools
 cx-Oracle
