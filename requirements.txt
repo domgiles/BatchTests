@@ -1,0 +1,14 @@
+pip
+halo
+spinners
+six
+colorama
+termcolor
+Faker
+python-dateutil
+mysql-connector-python
+protobuf
+wcwidth
+psycopg2
+setuptools
+cx-Oracle
