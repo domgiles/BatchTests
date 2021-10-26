@@ -106,6 +106,7 @@ class TransactionBench:
         self.hostname = args.hostname
         self.database = args.database
         self.target = args.target
+        self.connection_string = args.connectionstring
         self.size = args.size
         self.threads = args.threads
         self.seed_data = []
@@ -277,7 +278,11 @@ class TransactionBench:
                     with open('t1.ctl', 'w') as cfd:
                         cfd.write(self.control_file)
                     cf = 't1.ctl'
-                    result = subprocess.run([f"{oh}/sqlldr userid={self.username}/{self.password}@//{self.hostname}/{self.database} data={fd} control={os.path.join(os.getcwd())}/{cf} silent=all direct_path_lock_wait=true parallel=true"], stdout=subprocess.PIPE, cwd=os.getcwd(),
+                    if self.connection_string is None:
+                        cs = f"//{self.hostname}/{self.database}"
+                    else:
+                        cs = self.connection_string
+                    result = subprocess.run([f"{oh}/sqlldr userid={self.username}/{self.password}@{cs} data={fd} control={os.path.join(os.getcwd())}/{cf} silent=all direct_path_lock_wait=true parallel=true"], stdout=subprocess.PIPE, cwd=os.getcwd(),
                                             shell=True)
         except Exception as e:
             print(f"Got unexpected exception : {e}")
@@ -288,7 +293,10 @@ class TransactionBench:
         elif self.target == 'MySQL':
             return mysql.connector.connect(user=self.username, password=self.password, host=self.hostname, database=self.database)
         elif self.target == 'Oracle':
-            return cx_Oracle.connect(self.username, self.password, f'//{self.hostname}/{self.database}')
+            if self.connection_string is None:
+                return cx_Oracle.connect(self.username, self.password, f'//{self.hostname}/{self.database}')
+            else:
+                return cx_Oracle.connect(self.username, self.password, f'{self.connection_string}')
 
     def create_indexes(self):
         with self.get_connection() as connection:
@@ -319,8 +327,9 @@ if __name__ == '__main__':
     # group = parser.add_mutually_exclusive_group(required=False)
     parser.add_argument('-u', '--user', help='sys username', required=True)
     parser.add_argument('-p', '--password', help='sys password', required=True)
-    parser.add_argument('-ho', '--hostname', help='hostmname of target database', required=True)
-    parser.add_argument('-d', '--database', help='name of the database/service to run transactions against', required=True)
+    parser.add_argument('-ho', '--hostname', help='hostmname of target database', required=False)
+    parser.add_argument('-d', '--database', help='name of the database/service to run transactions against', required=False)
+    parser.add_argument('-cs', '--connectionstring', help='a full connection string rather than using hostname and database', required=False)
     parser.add_argument('-tc', '--threads', help='the number of threads used to simulate users running trasactions', default=1, type=int)
     parser.add_argument('-t', '--target', help='PostgreSQL,MySQL,Oracle', required=True, choices=['MySQL', 'PostgreSQL', 'Oracle'])
     parser.add_argument('-s', '--size', help='size of dataset i.e. 1 equivalent to 1GB', default=1.0, required=True, type=float)
@@ -328,6 +337,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    print(f"{Style.BRIGHT}{Fore.LIGHTRED_EX}BatchTests 0.2 for {args.target}{Style.RESET_ALL}")
+    print(f"{Style.BRIGHT}{Fore.LIGHTRED_EX}BatchTests 0.2 running against {args.target}{Style.RESET_ALL}")
+    print(f"{Style.DIM}{Fore.LIGHTRED_EX}Test started at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}{Style.RESET_ALL}")
 
     tb = TransactionBench(args)
