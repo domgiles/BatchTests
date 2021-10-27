@@ -274,6 +274,10 @@ class TransactionBench:
                             # print(f"Loaded file {file_details[1]} with {file_details[2]} rows")
                 elif self.target == 'Oracle':
                     oh = os.getenv('ORACLE_HOME')
+                    if oh is None:
+                        oh = ""
+                    else:
+                        oh = oh + "/"
                     fd = file_details[1]
                     with open('t1.ctl', 'w') as cfd:
                         cfd.write(self.control_file)
@@ -282,7 +286,7 @@ class TransactionBench:
                         cs = f"//{self.hostname}/{self.database}"
                     else:
                         cs = self.connection_string
-                    result = subprocess.run([f"{oh}/sqlldr userid={self.username}/{self.password}@{cs} data={fd} control={os.path.join(os.getcwd())}/{cf} silent=all direct_path_lock_wait=true parallel=true"], stdout=subprocess.PIPE, cwd=os.getcwd(),
+                    result = subprocess.run([f"{oh}sqlldr userid={self.username}/{self.password}@{cs} data={fd} control={os.path.join(os.getcwd())}/{cf} silent=all direct_path_lock_wait=true parallel=true"], stdout=subprocess.PIPE, cwd=os.getcwd(),
                                             shell=True)
         except Exception as e:
             print(f"Got unexpected exception : {e}")
@@ -296,7 +300,7 @@ class TransactionBench:
             if self.connection_string is None:
                 return cx_Oracle.connect(self.username, self.password, f'//{self.hostname}/{self.database}')
             else:
-                return cx_Oracle.connect(self.username, self.password, f'{self.connection_string}')
+                return cx_Oracle.connect(self.username, self.password, self.connection_string)
 
     def create_indexes(self):
         with self.get_connection() as connection:
@@ -321,8 +325,6 @@ class TransactionBench:
 
 
 if __name__ == '__main__':
-
-
     parser = argparse.ArgumentParser(description='Run simple batch like tests')
     # group = parser.add_mutually_exclusive_group(required=False)
     parser.add_argument('-u', '--user', help='sys username', required=True)
