@@ -286,10 +286,11 @@ class TransactionBench:
                         cs = f"//{self.hostname}/{self.database}"
                     else:
                         cs = self.connection_string
-                    result = subprocess.run([f"{oh}sqlldr userid={self.username}/{self.password}@{cs} data={fd} control={os.path.join(os.getcwd())}/{cf} silent=all direct_path_lock_wait=true parallel=true"], stdout=subprocess.PIPE, cwd=os.getcwd(),
-                                            shell=True)
+                    sqlldr_command = f"{oh}sqlldr userid={self.username}/{self.password}@{cs} data={fd} control={os.path.join(os.getcwd())}/{cf} silent=all direct_path_lock_wait=true parallel=true"
+                    result = subprocess.run([sqlldr_command], stdout=subprocess.PIPE, cwd=os.getcwd(), shell=True)
         except Exception as e:
             print(f"Got unexpected exception : {e}")
+            print(f"Command used :  {sqlldr_command}")
 
     def get_connection(self):
         if self.target == 'PostgreSQL':
