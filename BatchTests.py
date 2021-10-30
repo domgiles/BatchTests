@@ -111,6 +111,7 @@ class TransactionBench:
         self.threads = args.threads
         self.seed_data = []
         self.seed_data_size = 10000
+        self.delete_gen_file = not args.dontdelete
 
         records = int(3342227 * self.size)
         file_name = f'People_data_1_{records}.csv'
@@ -178,11 +179,12 @@ class TransactionBench:
         return [[all_files[0][0], target_file, row_count]]
 
     def delete_files(self, all_files):
-        for f in [file[1] for file in all_files]:
-            os.remove(f)
-        if self.target == 'Oracle':
-            os.remove('t1.ctl')
-            os.remove('t1.log')
+        if self.delete_gen_file:
+            for f in [file[1] for file in all_files]:
+                os.remove(f)
+            if self.target == 'Oracle':
+                os.remove('t1.ctl')
+                os.remove('t1.log')
 
     def generate_parallel(self, starting_id):
         all_files = []
@@ -286,7 +288,7 @@ class TransactionBench:
                         cs = f"//{self.hostname}/{self.database}"
                     else:
                         cs = self.connection_string
-                    sqlldr_command = f"{oh}sqldr userid={self.username}/{self.password}@{cs} data={fd} control={os.path.join(os.getcwd())}/{cf} silent=all direct_path_lock_wait=true parallel=true"
+                    sqlldr_command = f"{oh}sqlldr userid={self.username}/{self.password}@{cs} data={fd} control={os.path.join(os.getcwd())}/{cf} silent=all direct_path_lock_wait=true parallel=true"
                     result = subprocess.run([sqlldr_command], stdout=subprocess.PIPE, cwd=os.getcwd(), shell=True)
                     if result.returncode != 0:
                         print(f"Command failed run sqlldr command : {sqlldr_command}")
@@ -337,6 +339,7 @@ if __name__ == '__main__':
     parser.add_argument('-tc', '--threads', help='the number of threads used to simulate users running trasactions', default=1, type=int)
     parser.add_argument('-t', '--target', help='PostgreSQL,MySQL,Oracle', required=True, choices=['MySQL', 'PostgreSQL', 'Oracle'])
     parser.add_argument('-s', '--size', help='size of dataset i.e. 1 equivalent to 1GB', default=1.0, required=True, type=float)
+    parser.add_argument('-dd', '--dontdelete', help="dont delete generated files after run", required=False, action='store_true')
     parser.add_argument('--debug', help='enable debug', required=False, action='store_true')
 
     args = parser.parse_args()
