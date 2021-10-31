@@ -373,7 +373,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    print(f"{Style.BRIGHT}{Fore.LIGHTRED_EX}BatchTests 0.2 running against {args.target}{Style.RESET_ALL}")
+    print(f"{Style.BRIGHT}{Fore.LIGHTRED_EX}BatchTests 0.2 running against {args.target} with scale {args.size}{Style.RESET_ALL}")
     print(f"{Style.DIM}{Fore.LIGHTRED_EX}Test started at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}{Style.RESET_ALL}")
 
     tb = TransactionBench(args)
