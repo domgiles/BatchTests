@@ -132,7 +132,7 @@ class TransactionBench:
         self.create_table()
         print(f'{Fore.LIGHTBLACK_EX}Created table in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
         start = time.time()
-        self.load_data(all_files)
+        self.load_data(all_files, False)
         total_time += (time.time() - start)
         print(f'Loaded data to database serially in {Style.BRIGHT}{Fore.RED}{time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
         self.delete_files(all_files)
@@ -140,7 +140,7 @@ class TransactionBench:
         all_files = self.generate_parallel(records + 1)
         print(f'{Fore.LIGHTBLACK_EX}Written parallel datafiles to filesystem in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
         start = time.time()
-        self.load_data(all_files)
+        self.load_data(all_files, False)
         total_time += (time.time() - start)
         print(f'Loaded data to database in parallel in {Style.BRIGHT}{Fore.RED}{time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
         self.delete_files(all_files)
@@ -152,7 +152,7 @@ class TransactionBench:
         all_files = self.generate_parallel(records * 2 + 1)
         print(f'{Fore.LIGHTBLACK_EX}Written parallel datafiles to filesystem in {time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
         start = time.time()
-        self.load_data(all_files)
+        self.load_data(all_files, True)
         total_time += (time.time() - start)
         print(f'Loaded data to database in parallel in with indexes {Style.BRIGHT}{Fore.RED}{time.strftime("%H:%M:%S", time.gmtime(time.time() - start))}{Style.RESET_ALL}')
         self.delete_files(all_files)
@@ -259,11 +259,11 @@ class TransactionBench:
     # def get_connection(self):
     #     return psycopg2.connect(f"host={self.hostname} dbname={self.database} user={self.username} password={self.password}")
 
-    def load_data(self, file_details):
+    def load_data(self, file_details, loading_with_indexes):
         with ProcessPoolExecutor(max_workers=self.threads) as executor:
-            executor.map(self.load_data_task, file_details)
+            executor.map(self.load_data_task, file_details, (loading_with_indexes,))
 
-    def load_data_task(self, file_details):
+    def load_data_task(self, file_details, loading_with_indexes):
         try:
             with open(os.path.join(os.getcwd(), file_details[1]), 'r') as data_file:
                 next(data_file)
@@ -288,7 +288,11 @@ class TransactionBench:
                         cs = f"//{self.hostname}/{self.database}"
                     else:
                         cs = self.connection_string
-                    sqlldr_command = f"{oh}sqlldr userid={self.username}/{self.password}@'{cs}' data={fd} control={os.path.join(os.getcwd())}/{cf} silent=all direct_path_lock_wait=true parallel=true"
+                    if loading_with_indexes:
+                        direct_load_string = 'rows=10000'
+                    else:
+                        direct_load_string = 'direct=true'
+                    sqlldr_command = f"{oh}sqlldr userid={self.username}/{self.password}@'{cs}' data={fd} control={os.path.join(os.getcwd())}/{cf} silent=all direct_path_lock_wait=true {direct_load_string} parallel=true"
                     result = subprocess.run([sqlldr_command], stdout=subprocess.PIPE, cwd=os.getcwd(), shell=True)
                     if result.returncode != 0:
                         print(f"Command failed run sqlldr command : {sqlldr_command}")
