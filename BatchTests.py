@@ -1,6 +1,7 @@
 import argparse
 import csv
 import datetime
+import logging
 import os
 import shutil
 import subprocess
@@ -101,6 +102,16 @@ class TransactionBench:
 
     # Probably don't need to make this a class. Everything is done in the init method.... but just in case.
     def __init__(self, args):
+
+        if args.debug:
+            logging.basicConfig(level=logging.DEBUG)
+            logging.getLogger("faker.factory").disabled = True
+            self.debugging = True
+        else:
+            logger = logging.getLogger()
+            logger.disabled = True
+            self.debugging = False
+
         self.username = args.user
         self.password = args.password
         self.hostname = args.hostname
@@ -112,6 +123,8 @@ class TransactionBench:
         self.seed_data = []
         self.seed_data_size = 10000
         self.delete_gen_file = not args.dontdelete
+
+
 
         records = int(3342227 * self.size)
         file_name = f'People_data_1_{records}.csv'
@@ -202,13 +215,17 @@ class TransactionBench:
             with connection.cursor() as cur:
                 if self.target == "PostgreSQL":
                     cur.execute(self.drop_table_p)
+                    logging.debug(f"Statement executed : {self.drop_table_p}")
                     cur.execute(self.table_defintion_p)
+                    logging.debug(f"Statement executed : {self.drop_table_p}")
                 elif self.target == "Oracle":
                     try:
                         cur.execute(self.drop_table_o)
+                        logging.debug(f"Statement executed : {self.drop_table_o}")
                     except Exception as e:
                         print(f"{Fore.LIGHTBLACK_EX}Table probably already existed : {e}{Fore.RESET}")
                     cur.execute(self.table_defintion_o)
+                    logging.debug(f"Statement executed : {self.table_defintion_o}")
                 # connection.commit()
 
                 connection.commit()
@@ -289,11 +306,13 @@ class TransactionBench:
                     else:
                         cs = self.connection_string
                     if loading_with_indexes:
-                        direct_load_string = 'rows=10000'
+                        direct_load_string = ''
                     else:
                         direct_load_string = 'direct=true'
                     sqlldr_command = f"{oh}sqlldr userid={self.username}/{self.password}@'{cs}' data={fd} control={os.path.join(os.getcwd())}/{cf} silent=all direct_path_lock_wait=true {direct_load_string} parallel=true"
                     result = subprocess.run([sqlldr_command], stdout=subprocess.PIPE, cwd=os.getcwd(), shell=True)
+                    if self.debugging:
+                        print(f"{Fore.LIGHTRED_EX}DEBUG:root:Statement executed : {sqlldr_command}{Fore.RESET}")
                     if result.returncode != 0:
                         print(f"Command failed run sqlldr command : {sqlldr_command}")
         except Exception as e:
@@ -314,21 +333,27 @@ class TransactionBench:
         with self.get_connection() as connection:
             with connection.cursor() as cur:
                 cur.execute(self.create_pk)
+                logging.debug(f"Statement executed : {self.create_pk}")
                 cur.execute(self.create_index_1)
+                logging.debug(f"Statement executed : {self.create_index_1}")
                 cur.execute(self.create_index_2)
+                logging.debug(f"Statement executed : {self.create_index_2}")
                 cur.execute(self.create_index_3)
+                logging.debug(f"Statement executed : {self.create_index_3}")
                 connection.commit()
 
     def update_data(self):
         with self.get_connection() as connection:
             with connection.cursor() as cur:
                 cur.execute(self.update_statement)
+                logging.debug(f"Statement executed : {self.update_statement}")
                 connection.commit()
 
     def scan_data(self):
         with self.get_connection() as connection:
             with connection.cursor() as cur:
                 cur.execute(self.select_statement)
+                logging.debug(f"Statement executed : {self.select_statement}")
                 rows = cur.fetchall()
 
 
