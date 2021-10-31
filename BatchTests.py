@@ -288,7 +288,7 @@ class TransactionBench:
                         cs = f"//{self.hostname}/{self.database}"
                     else:
                         cs = self.connection_string
-                    sqlldr_command = f"{oh}sqlldr userid={self.username}/{self.password}@{cs} data={fd} control={os.path.join(os.getcwd())}/{cf} silent=all direct_path_lock_wait=true parallel=true"
+                    sqlldr_command = f"{oh}sqlldr userid={self.username}/{self.password}@'{cs}' data={fd} control={os.path.join(os.getcwd())}/{cf} silent=all direct_path_lock_wait=true parallel=true"
                     result = subprocess.run([sqlldr_command], stdout=subprocess.PIPE, cwd=os.getcwd(), shell=True)
                     if result.returncode != 0:
                         print(f"Command failed run sqlldr command : {sqlldr_command}")
