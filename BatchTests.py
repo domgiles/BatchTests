@@ -213,7 +213,7 @@ class TransactionBench:
     def create_table(self):
         with self.get_connection() as connection:
             with connection.cursor() as cur:
-                if self.target == "PostgreSQL":
+                if self.target == "PostgreSQL" or self.target == "MySQL":
                     cur.execute(self.drop_table_p)
                     logging.debug(f"Statement executed : {self.drop_table_p}")
                     cur.execute(self.table_defintion_p)
@@ -226,8 +226,6 @@ class TransactionBench:
                         print(f"{Fore.LIGHTBLACK_EX}Table probably already existed : {e}{Fore.RESET}")
                     cur.execute(self.table_defintion_o)
                     logging.debug(f"Statement executed : {self.table_defintion_o}")
-                # connection.commit()
-
                 connection.commit()
 
     def generate_seed_data(self) -> []:
@@ -291,6 +289,11 @@ class TransactionBench:
                             cur.copy_from(data_file, file_details[0], sep='|')
                             connection.commit()
                             # print(f"Loaded file {file_details[1]} with {file_details[2]} rows")
+                elif self.target == 'MySQL':
+                    with self.get_connection() as connection:
+                        with connection.cursor() as cur:
+                            cur.execute(f"LOAD DATA LOCAL INFILE '{file_details[1]}' INTO TABLE {file_details[0].lower()} FIELDS TERMINATED BY '|'")
+                            connection.commit()
                 elif self.target == 'Oracle':
                     oh = os.getenv('ORACLE_HOME')
                     if oh is None:
@@ -322,7 +325,7 @@ class TransactionBench:
         if self.target == 'PostgreSQL':
             return psycopg2.connect(f"host={self.hostname} dbname={self.database} user={self.username} password={self.password}")
         elif self.target == 'MySQL':
-            return mysql.connector.connect(user=self.username, password=self.password, host=self.hostname, database=self.database)
+            return mysql.connector.connect(user=self.username, password=self.password, host=self.hostname, database=self.database, allow_local_infile=True)
         elif self.target == 'Oracle':
             if self.connection_string is None:
                 return cx_Oracle.connect(self.username, self.password, f'//{self.hostname}/{self.database}')
