@@ -1,10 +1,10 @@
 # BatchTests
 
-Simple test to measure basic capabilities of a database (currently PostgreSQL and Oracle). For the first time I'm using the "Faker" library for data generation. It's a little slow so I may revert to hand crafted approach in the future.
+Simple test to measure basic capabilities of a database (PostgreSQL, Oracle and MySQL). I'm using the "Faker" library for data generation. It's a little slow so I may revert to hand crafted approach in the future.
 
 
 ### Installation
-You'll need Python 3.6 or higher installed on the plaform I recommend using a virtual env to create the needed environment.
+You'll need Python 3.6 or higher installed on the platform I recommend using a virtual env to create the needed environment.
 
 Install the following python libs using the following command. You may need to update pip to install ```psycopg2-binary``` successfully 
 
