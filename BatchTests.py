@@ -65,6 +65,9 @@ class TransactionBench:
                             Password varchar(50)
                             )"""
 
+    date_format = "DD-MM-YYYY"
+    timestamp_format = "HH24:mi:ss"
+
     control_file = """LOAD DATA APPEND INTO TABLE CUSTOMERS_TEST FIELDS TERMINATED BY "|"
                     (id,
                     email,
@@ -86,6 +89,47 @@ class TransactionBench:
                     bank,
                     password)"""
 
+    customer_columns = [
+        {"ColumnName": "id",
+         "DataType": "Number"},
+        {"ColumnName": "email",
+         "DataType": "String"},
+        {"ColumnName": "prefix",
+         "DataType": "String"},
+        {"ColumnName": "name",
+         "DataType": "String"},
+        {"ColumnName": "birth_date",
+         "DataType": "Date"},
+        {"ColumnName": "phone_number",
+         "DataType": "String"},
+        {"ColumnName": "additional_email",
+         "DataType": "String"},
+        {"ColumnName": "address",
+         "DataType": "String"},
+        {"ColumnName": "postcode",
+         "DataType": "String"},
+        {"ColumnName": "city",
+         "DataType": "String"},
+        {"ColumnName": "county",
+         "DataType": "String"},
+        {"ColumnName": "country",
+         "DataType": "String"},
+        {"ColumnName": "yearjoined",
+         "DataType": "Number"},
+        {"ColumnName": "timejoined",
+         "DataType": "Timestamp"},
+        {"ColumnName": "link",
+         "DataType": "String"},
+        {"ColumnName": "comments",
+         "DataType": "String"},
+        {"ColumnName": "occupation",
+         "DataType": "String"},
+        {"ColumnName": "bank",
+         "DataType": "String"},
+        {"ColumnName": "password",
+         "DataType": "String"}
+    ]
+
     create_pk = """ALTER TABLE customers_test ADD PRIMARY KEY (Id)"""
 
     create_index_1 = """CREATE INDEX CUST_INDEX_1 ON customers_test(Email)"""
@@ -101,8 +145,8 @@ class TransactionBench:
     set_date_format = '''SET datestyle = "ISO, DMY"'''
 
     # Probably don't need to make this a class. Everything is done in the init method.... but just in case.
-    def __init__(self, args):
 
+    def __init__(self, args):
         if args.debug:
             logging.basicConfig(level=logging.DEBUG)
             logging.getLogger("faker.factory").disabled = True
@@ -123,8 +167,7 @@ class TransactionBench:
         self.seed_data = []
         self.seed_data_size = 10000
         self.delete_gen_file = not args.dontdelete
-
-
+        self.use_dml_to_load = args.dmlload
 
         records = int(3342227 * self.size)
         file_name = f'People_data_1_{records}.csv'
@@ -196,8 +239,10 @@ class TransactionBench:
             for f in [file[1] for file in all_files]:
                 os.remove(f)
             if self.target == 'Oracle':
-                os.remove('t1.ctl')
-                os.remove('t1.log')
+                if os.path.isfile('t1.ctl'):
+                    os.remove('t1.ctl')
+                if os.path.isfile('t1.log'):
+                    os.remove('t1.log')
 
     def generate_parallel(self, starting_id):
         all_files = []
@@ -295,31 +340,61 @@ class TransactionBench:
                             cur.execute(f"LOAD DATA LOCAL INFILE '{file_details[1]}' INTO TABLE {file_details[0].lower()} FIELDS TERMINATED BY '|'")
                             connection.commit()
                 elif self.target == 'Oracle':
-                    oh = os.getenv('ORACLE_HOME')
-                    if oh is None:
-                        oh = ""
+                    if self.use_dml_to_load:
+                        self.load_file(file_details)
                     else:
-                        oh = oh + "/"
-                    fd = file_details[1]
-                    with open('t1.ctl', 'w') as cfd:
-                        cfd.write(self.control_file)
-                    cf = 't1.ctl'
-                    if self.connection_string is None:
-                        cs = f"//{self.hostname}/{self.database}"
-                    else:
-                        cs = self.connection_string
-                    if loading_with_indexes:
-                        direct_load_string = ''
-                    else:
-                        direct_load_string = 'direct=true'
-                    sqlldr_command = f"{oh}sqlldr userid={self.username}/{self.password}@'{cs}' data={fd} control={os.path.join(os.getcwd())}/{cf} silent=all direct_path_lock_wait=true {direct_load_string} parallel=true"
-                    result = subprocess.run([sqlldr_command], stdout=subprocess.PIPE, cwd=os.getcwd(), shell=True)
-                    if self.debugging:
-                        print(f"{Fore.LIGHTRED_EX}DEBUG:root:Statement executed : {sqlldr_command}{Fore.RESET}")
-                    if result.returncode != 0:
-                        print(f"Command failed run sqlldr command : {sqlldr_command}")
+                        oh = os.getenv('ORACLE_HOME')
+                        if oh is None:
+                            oh = ""
+                        else:
+                            oh = oh + "/"
+                        fd = file_details[1]
+                        with open('t1.ctl', 'w') as cfd:
+                            cfd.write(self.control_file)
+                        cf = 't1.ctl'
+                        if self.connection_string is None:
+                            cs = f"//{self.hostname}/{self.database}"
+                        else:
+                            cs = self.connection_string
+                        if loading_with_indexes:
+                            direct_load_string = ''
+                        else:
+                            direct_load_string = 'direct=true'
+                        sqlldr_command = f"{oh}sqlldr userid={self.username}/{self.password}@'{cs}' data={fd} control={os.path.join(os.getcwd())}/{cf} silent=all direct_path_lock_wait=true {direct_load_string} parallel=true"
+                        result = subprocess.run([sqlldr_command], stdout=subprocess.PIPE, cwd=os.getcwd(), shell=True)
+                        if self.debugging:
+                            print(f"{Fore.LIGHTRED_EX}DEBUG:root:Statement executed : {sqlldr_command}{Fore.RESET}")
+                        if result.returncode != 0:
+                            print(f"Command failed run sqlldr command : {sqlldr_command}")
         except Exception as e:
             print(f"Got unexpected exception : {e}")
+
+    def load_file(self, file_details):
+        with self.get_connection() as connection:
+            file = os.path.join(os.getcwd(), file_details[1])
+            with open(file, 'r') as f:
+                with connection.cursor() as cur:
+                    res = csv.DictReader(f, delimiter='|', fieldnames=[c['ColumnName'] for c in self.customer_columns])
+                    stmt = f"insert into CUSTOMERS_TEST ({','.join([col['ColumnName'] for col in self.customer_columns])}) values ("
+                    for c in self.customer_columns:
+                        if c["DataType"] == "Date":
+                            stmt += f"to_date(:{c['ColumnName']},'{self.date_format}'), "
+                        elif c["DataType"] == "Timestamp":
+                            stmt += f"to_timestamp(:{c['ColumnName']},'{self.timestamp_format}'), "
+                        else:
+                            stmt += f":{c['ColumnName']}, "
+                    stmt = stmt.rstrip(", ")
+                    stmt += ")"
+                    data_array = []
+                    for i, row in enumerate(res):
+                        data_array.append(row)
+                        if i % 1000 == 0:
+                            cur.executemany(stmt, data_array)
+                            data_array = []
+                        if i % 10000 == 0:
+                            connection.commit()
+                    cur.executemany(stmt, data_array)
+                    connection.commit()
 
     def get_connection(self):
         if self.target == 'PostgreSQL':
@@ -372,6 +447,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--target', help='PostgreSQL,MySQL,Oracle', required=True, choices=['MySQL', 'PostgreSQL', 'Oracle'])
     parser.add_argument('-s', '--size', help='size of dataset i.e. 1 equivalent to 1GB', default=1.0, required=True, type=float)
     parser.add_argument('-dd', '--dontdelete', help="dont delete generated files after run", required=False, action='store_true')
+    parser.add_argument('-dl', '--dmlload', help="use dml to load data instead of vendor tool", required=False, action='store_true', default=False)
     parser.add_argument('--debug', help='enable debug', required=False, action='store_true')
 
     args = parser.parse_args()
